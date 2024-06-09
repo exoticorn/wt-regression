@@ -2,41 +2,50 @@ use anyhow::Result;
 use criterion::{criterion_group, criterion_main, Criterion};
 use wasmtime::{GlobalType, MemoryType, Mutability, ValType};
 
-fn benchmark_frame(c: &mut Criterion, timeout: bool) -> Result<()> {
+fn benchmark_frame(c: &mut Criterion) {
+    fn inner(c: &mut Criterion) -> Result<()> {
+        let mut config = wasmtime::Config::new();
+        config.cranelift_opt_level(wasmtime::OptLevel::Speed);
+        let engine = wasmtime::Engine::new(&config)?;
 
-    let mut config = wasmtime::Config::new();
-    config.cranelift_opt_level(wasmtime::OptLevel::Speed);
-    if timeout {
-        config.epoch_interruption(true);
+        let mut store = wasmtime::Store::new(&engine, ());
+        store.set_epoch_deadline(60);
+
+        let memory = wasmtime::Memory::new(&mut store, MemoryType::new(4, Some(4)))?;
+
+        let mut linker = wasmtime::Linker::new(&engine);
+        linker.define("env", "memory", memory)?;
+
+        let platform_module = wasmtime::Module::new(&engine, include_bytes!("platform.wasm"))?;
+        let module = wasmtime::Module::new(&engine, include_bytes!("technotunnel.wasm"))?;
+
+        add_native_functions(&mut linker, &mut store)?;
+
+        let platform_instance = linker.instantiate(&mut store, &platform_module)?;
+
+        for export in platform_instance.exports(&mut store) {
+            linker.define(
+                "env",
+                export.name(),
+                export
+                    .into_func()
+                    .expect("platform surely only exports functions"),
+            )?;
+        }
+
+        let instance = linker.instantiate(&mut store, &module)?;
+
+        let update = instance.get_typed_func::<(), (), _>(&mut store, "upd")?;
+
+        c.bench_function("technotunnel_upd", |b| {
+            b.iter(|| {
+                update.call(&mut store, ()).unwrap();
+            })
+        });
+
+        Ok(())
     }
-    let engine = wasmtime::Engine::new(&config)?;
-
-    let mut store = wasmtime::Store::new(&engine, ());
-    store.set_epoch_deadline(60);
-
-    let memory = wasmtime::Memory::new(&mut store, MemoryType::new(4, Some(4)))?;
-
-    let mut linker = wasmtime::Linker::new(&engine);
-    linker.define("env", "memory", memory)?;
-
-    let platform_module = wasmtime::Module::new(&engine, include_bytes!("platform.wasm"))?;
-    let module = wasmtime::Module::new(&engine, include_bytes!("technotunnel.wasm"))?;
-
-    add_native_functions(&mut linker, &mut store)?;
-
-    let _platform_instance = instantiate_platform(&mut linker, &mut store, &platform_module)?;
-    let instance = linker.instantiate(&mut store, &module)?;
-
-    let update = instance.get_typed_func::<(), (), _>(&mut store, "upd")?;
-
-    let name = if timeout { "upd_timeout" } else { "upd" };
-
-    c.bench_function(name, |b| b.iter(|| {
-        store.set_epoch_deadline(10);
-        update.call(&mut store, ()).unwrap();
-    }));
-
-    Ok(())
+    inner(c).unwrap();
 }
 
 fn add_native_functions(
@@ -81,33 +90,5 @@ fn add_native_functions(
     Ok(())
 }
 
-fn instantiate_platform(
-    linker: &mut wasmtime::Linker<()>,
-    store: &mut wasmtime::Store<()>,
-    platform_module: &wasmtime::Module,
-) -> Result<wasmtime::Instance> {
-    let platform_instance = linker.instantiate(&mut *store, &platform_module)?;
-
-    for export in platform_instance.exports(&mut *store) {
-        linker.define(
-            "env",
-            export.name(),
-            export
-                .into_func()
-                .expect("platform surely only exports functions"),
-        )?;
-    }
-
-    Ok(platform_instance)
-}
-
-fn benchmark_frame_no_timeout(c: &mut Criterion) {
-    benchmark_frame(c, false).unwrap();
-}
-
-fn benchmark_frame_timeout(c: &mut Criterion) {
-    benchmark_frame(c, true).unwrap();
-}
-
-criterion_group!(benches, benchmark_frame_no_timeout, benchmark_frame_timeout);
+criterion_group!(benches, benchmark_frame);
 criterion_main!(benches);
