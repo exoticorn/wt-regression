@@ -33,6 +33,7 @@ fn benchmark_frame(c: &mut Criterion) {
     }
     inner(c, include_bytes!("technotunnel.wasm"), "technotunnel_upd").unwrap();
     inner(c, include_bytes!("technotunnel_nosin.wasm"), "technotunnel_nosin_upd").unwrap();
+    inner(c, include_bytes!("simple_loop.wasm"), "simple_loop_upd").unwrap();
 }
 
 criterion_group!(benches, benchmark_frame);

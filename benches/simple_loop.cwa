@@ -1,0 +1,12 @@
+import "env.memory" memory(4);
+import "env.sin" fn sin(f32) -> f32;
+
+export fn upd() {
+    let i: i32;
+    let sum: f32;
+    loop iterations {
+        sum += sin(i as f32);
+        branch_if (i +:= 1) < 100000: iterations;
+    }
+    f32.store(sum, 0, 0);
+}
