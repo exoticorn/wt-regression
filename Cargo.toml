@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-criterion = { version = "0.3.0", default-features = false }
-wasmtime = "0.37.0"
+criterion = { version = "0.5.1", default-features = false }
+wasmtime = "21.0.1"
 anyhow = "1"
 
 [[bench]]

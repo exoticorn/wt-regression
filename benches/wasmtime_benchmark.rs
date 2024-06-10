@@ -13,7 +13,7 @@ fn benchmark_frame(c: &mut Criterion) {
         let memory = wasmtime::Memory::new(&mut store, MemoryType::new(4, Some(4)))?;
 
         let mut linker = wasmtime::Linker::new(&engine);
-        linker.define("env", "memory", memory)?;
+        linker.define(&store, "env", "memory", memory)?;
 
         let module = wasmtime::Module::new(&engine, wasm)?;
 
@@ -21,7 +21,7 @@ fn benchmark_frame(c: &mut Criterion) {
 
         let instance = linker.instantiate(&mut store, &module)?;
 
-        let update = instance.get_typed_func::<(), (), _>(&mut store, "upd")?;
+        let update = instance.get_typed_func::<(), ()>(&mut store, "upd")?;
 
         c.bench_function(id, |b| {
             b.iter(|| {
