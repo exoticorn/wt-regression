@@ -6,6 +6,7 @@ fn benchmark_frame(c: &mut Criterion) {
     fn inner(c: &mut Criterion, wasm: &[u8], id: &str) -> Result<()> {
         let mut config = wasmtime::Config::new();
         config.cranelift_opt_level(wasmtime::OptLevel::Speed);
+        // config.profiler(wasmtime::ProfilingStrategy::JitDump);
         let engine = wasmtime::Engine::new(&config)?;
 
         let mut store = wasmtime::Store::new(&engine, ());
@@ -13,7 +14,7 @@ fn benchmark_frame(c: &mut Criterion) {
         let memory = wasmtime::Memory::new(&mut store, MemoryType::new(4, Some(4)))?;
 
         let mut linker = wasmtime::Linker::new(&engine);
-        linker.define("env", "memory", memory)?;
+        linker.define(&mut store, "env", "memory", memory)?;
 
         let module = wasmtime::Module::new(&engine, wasm)?;
 
@@ -21,7 +22,7 @@ fn benchmark_frame(c: &mut Criterion) {
 
         let instance = linker.instantiate(&mut store, &module)?;
 
-        let update = instance.get_typed_func::<(), (), _>(&mut store, "upd")?;
+        let update = instance.get_typed_func::<(), ()>(&mut store, "upd")?;
 
         c.bench_function(id, |b| {
             b.iter(|| {
@@ -32,7 +33,12 @@ fn benchmark_frame(c: &mut Criterion) {
         Ok(())
     }
     inner(c, include_bytes!("technotunnel.wasm"), "technotunnel_upd").unwrap();
-    inner(c, include_bytes!("technotunnel_nosin.wasm"), "technotunnel_nosin_upd").unwrap();
+    inner(
+        c,
+        include_bytes!("technotunnel_nosin.wasm"),
+        "technotunnel_nosin_upd",
+    )
+    .unwrap();
     inner(c, include_bytes!("simple_loop.wasm"), "simple_loop_upd").unwrap();
 }
 
