@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 criterion = { version = "0.5.1", default-features = false }
-wasmtime = { git = "https://github.com/bytecodealliance/wasmtime", branch = "release-22.0.0" }
+wasmtime = { git = "https://github.com/bytecodealliance/wasmtime", branch = "main", default-features = false, features = ["wat", "cranelift", "runtime"] }
 anyhow = "1"
 
 [[bench]]
